@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { queryTradeInfo } = require('../utils/ecpay');
 const { SHIPPING_METHODS, calculateShipping } = require('../utils/shipping');
 const { applyCoupon } = require('../utils/coupon');
+const { parseOrderListQuery } = require('../utils/orderListQuery');
 const {
   serializeOrder,
   findOrderById,
@@ -253,10 +254,29 @@ router.post('/', (req, res) => {
  * @openapi
  * /api/orders:
  *   get:
- *     summary: 自己的訂單列表
+ *     summary: 自己的訂單列表（可依狀態篩選、分頁，依建立時間由新到舊）
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, paid, failed]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         description: 每頁筆數，超過 50 以 50 計
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 10
  *     responses:
  *       200:
  *         description: 成功
@@ -294,17 +314,46 @@ router.post('/', (req, res) => {
  *                             type: string
  *                           created_at:
  *                             type: string
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         page:
+ *                           type: integer
+ *                         limit:
+ *                           type: integer
+ *                         total:
+ *                           type: integer
+ *                         totalPages:
+ *                           type: integer
  *                 error:
  *                   type: string
  *                   nullable: true
  *                 message:
  *                   type: string
+ *       400:
+ *         description: status 不在允許值內，或 page、limit 不是正整數
+ *       401:
+ *         description: 未登入
  */
 router.get('/', (req, res) => {
-  const orders = listOrdersForUser(req.user.userId);
+  const query = parseOrderListQuery(req.query);
+  if (!query.ok) {
+    return res.status(400).json({ data: null, error: 'VALIDATION_ERROR', message: query.message });
+  }
+
+  const { status, page, limit } = query;
+  const { orders, total } = listOrdersForUser(req.user.userId, { status, page, limit });
 
   res.json({
-    data: { orders: orders.map(serializeOrder) },
+    data: {
+      orders: orders.map(serializeOrder),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    },
     error: null,
     message: '成功'
   });

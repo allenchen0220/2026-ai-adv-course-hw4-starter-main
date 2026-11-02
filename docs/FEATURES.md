@@ -9,7 +9,7 @@
 | 購物車管理 | ✅ 完成 | 雙模式認證（JWT / Session ID），登入時合併訪客購物車 |
 | 配送費用 | ✅ 完成 | 宅配/超商、滿額免基本運費、偏遠/急件附加費 |
 | 結帳優惠碼 | ✅ 完成 | FLOWER100、SPRING10，只折抵商品小計，免運門檻以折扣後小計判斷 |
-| 訂單管理 | ✅ 完成 | 建立、查詢、模擬付款（僅測試環境） |
+| 訂單管理 | ✅ 完成 | 建立、查詢（依狀態篩選與分頁）、模擬付款（僅測試環境） |
 | 綠界金流串接 | ✅ 完成 | ECPay AIO 付款、QueryTradeInfo 查詢驗證 |
 | 後台商品管理 | ✅ 完成 | 商品 CRUD |
 | 後台訂單管理 | ✅ 完成 | 訂單查詢與狀態篩選 |
@@ -309,9 +309,42 @@
 
 ### GET /api/orders — 訂單列表
 
-**行為描述**：回傳當前使用者的所有訂單，依建立時間降序排列。無分頁。
+**行為描述**：回傳當前使用者的訂單，可依狀態篩選並分頁，依建立時間由新到舊排列（同一秒建立的訂單以寫入順序，較新的在前）。
 
-**回應欄位**：id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method, is_remote_area, is_express, total_amount, status, created_at
+**Query 參數**：
+
+| 參數 | 型別 | 預設 | 驗證規則 |
+|------|------|------|----------|
+| status | string | 不篩選 | `pending`、`paid` 或 `failed` |
+| page | integer | 1 | 正整數（不超過 `Number.MAX_SAFE_INTEGER`） |
+| limit | integer | 10 | 正整數，超過 50 以 50 計 |
+
+**回應格式**（與 `GET /api/admin/orders` 相同）：
+
+```json
+{
+  "data": {
+    "orders": [ ... ],
+    "pagination": { "page": 1, "limit": 10, "total": 12, "totalPages": 2 }
+  },
+  "error": null,
+  "message": "成功"
+}
+```
+
+**訂單欄位**：id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method, is_remote_area, is_express, total_amount, status, created_at
+
+**業務邏輯**：
+- 參數由 `src/utils/orderListQuery.js` 的 `parseOrderListQuery` 解析與驗證
+- 查詢條件含 `user_id`，不會回傳其他會員的訂單
+- `total` 為符合條件的總筆數；超過最後一頁時回傳空陣列，`totalPages` 為 `ceil(total / limit)`
+
+**錯誤情境**：
+
+| 狀態碼 | 錯誤碼 | 情境 |
+|--------|--------|------|
+| 400 | VALIDATION_ERROR | `status` 不在允許值內，或 `page`、`limit` 不是正整數 |
+| 401 | UNAUTHORIZED | 未登入 |
 
 ### GET /api/orders/:id — 訂單詳情
 
