@@ -140,7 +140,7 @@ Integration Test 中有兩層防護：
 | `tests/auth.test.js` | 註冊、登入、重複 Email、個人資料、非字串欄位、JSON 格式錯誤 |
 | `tests/products.test.js` | 商品列表、分頁、詳情與 404 |
 | `tests/cart.test.js` | 訪客/會員購物車 CRUD、數量驗證、登入/註冊時合併訪客購物車（含庫存上限） |
-| `tests/orders.test.js` | 建單、配送費、查詢與認證（含他人訂單 404）、模擬付款僅限測試環境 |
+| `tests/orders.test.js` | 建單、配送費、查詢與認證（含他人訂單 404）、非字串 `couponCode`、模擬付款僅限測試環境 |
 | `tests/adminProducts.test.js` | 後台商品 CRUD 與權限、刪除仍在購物車中的商品、名稱驗證 |
 | `tests/adminOrders.test.js` | 後台訂單列表、詳情與篩選 |
 
@@ -156,9 +156,11 @@ Integration Test 中有兩層防護：
 | 前端入口 | `/cart`、`/checkout`、checkout.js 皆可取得，配送欄位存在 |
 | 完整建單 | 註冊 → 取商品 → 加購物車 → 建立含配送資訊的訂單 |
 | DB 持久化 | orders、order_items、收件/配送快照正確 |
-| 金額 | 小計 1,400、運費 510、總額 1,910 |
+| 金額 | 小計 1,400、運費 510、總額 1,910；未使用優惠碼時 `discount` 0、`coupon_code` null（建單、DB、詳情、列表） |
 | 庫存/購物車 | 庫存 10 → 8，建單後購物車清空 |
 | 庫存不足 | 400 / `STOCK_INSUFFICIENT`，無訂單、無扣庫存、購物車保留 |
+| 優惠碼快照 | `spring10` 以 `SPRING10` 記錄，折扣 140、總額 1,770 寫入 DB，綠界 `TotalAmount` 為 1770 |
+| 優惠碼被拒 | `COUPON_NOT_FOUND`、`COUPON_EXPIRED`、`COUPON_MIN_SUBTOTAL_NOT_MET` 皆回 400，無訂單、無扣庫存、購物車保留 |
 | transaction 回滾 | 臨時 SQLite trigger 使第二筆品項寫入失敗，驗證訂單/品項/庫存/購物車全數回滾 |
 | ECPay AIO 表單 | staging action、MerchantTradeNo、TotalAmount、ItemName、URL 與 CheckMacValue |
 | QueryTradeInfo | mock 已付（附有效 CheckMacValue）、未付、HTTP 錯誤；驗證 API 與 DB 狀態 |
@@ -173,6 +175,14 @@ subtotal     = 700 × 2 = 1400
 shipping_fee = 60 + 200 + 250 = 510
 total_amount = 1400 + 510 = 1910
 stock        = 10 - 2 = 8
+```
+
+使用 `SPRING10` 時（同一 fixture）：
+
+```text
+discount     = round(1400 × 10%) = 140
+shipping_fee = 60 + 200 + 250 = 510（折扣後 1,260 未達免運）
+total_amount = 1400 - 140 + 510 = 1770
 ```
 
 ## Fixture 與清理

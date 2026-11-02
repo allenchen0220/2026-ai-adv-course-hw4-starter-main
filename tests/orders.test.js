@@ -169,6 +169,27 @@ describe('Orders API', () => {
     expect(res.body).toHaveProperty('error', 'VALIDATION_ERROR');
   });
 
+  it('should reject a non-string couponCode', async () => {
+    for (const couponCode of [123, { code: 'FLOWER100' }, ['FLOWER100']]) {
+      const res = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          recipientName: '測試收件人',
+          recipientEmail: 'recipient@example.com',
+          recipientAddress: '台北市測試路 123 號',
+          shippingMethod: 'home_delivery',
+          isRemoteArea: false,
+          isExpress: false,
+          couponCode,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('data', null);
+      expect(res.body).toHaveProperty('error', 'VALIDATION_ERROR');
+    }
+  });
+
   it('should hide mock payment outside the test environment', async () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'development';

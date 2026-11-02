@@ -187,6 +187,8 @@ describe('Order checkout integration flow', () => {
     expect(orderResponse.body.error).toBeNull();
     expect(orderResponse.body.data).toMatchObject({
       subtotal: 1400,
+      discount: 0,
+      coupon_code: null,
       shipping_fee: 510,
       shipping_method: 'convenience_store',
       is_remote_area: true,
@@ -210,6 +212,8 @@ describe('Order checkout integration flow', () => {
       recipient_email: ORDER_PAYLOAD.recipientEmail,
       recipient_address: ORDER_PAYLOAD.recipientAddress,
       subtotal: 1400,
+      coupon_code: null,
+      discount: 0,
       shipping_fee: 510,
       shipping_method: 'convenience_store',
       is_remote_area: 1,
@@ -243,10 +247,25 @@ describe('Order checkout integration flow', () => {
     expect(detailResponse.body.data).toMatchObject({
       id: orderId,
       subtotal: 1400,
+      discount: 0,
+      coupon_code: null,
       shipping_fee: 510,
       total_amount: 1910
     });
     expect(detailResponse.body.data.items).toHaveLength(1);
+
+    const listResponse = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${token}`);
+    expectEnvelope(listResponse, 200);
+    expect(listResponse.body.data.orders).toHaveLength(1);
+    expect(listResponse.body.data.orders[0]).toMatchObject({
+      id: orderId,
+      subtotal: 1400,
+      discount: 0,
+      coupon_code: null,
+      total_amount: 1910
+    });
   });
 
   it('does not create an order or deduct stock when current stock is insufficient', async () => {
@@ -306,19 +325,23 @@ describe('Order checkout integration flow', () => {
     expect(parseHiddenInputs(formResponse.text).TotalAmount).toBe('1770');
   });
 
-  it('leaves orders, stock and cart untouched when the coupon is rejected', async () => {
+  // Subtotal is 700, below the FLOWER100 minimum of 800
+  it.each([
+    ['NOT-A-COUPON', 'COUPON_NOT_FOUND'],
+    ['SUMMER50', 'COUPON_EXPIRED'],
+    ['FLOWER100', 'COUPON_MIN_SUBTOTAL_NOT_MET']
+  ])('leaves orders, stock and cart untouched when coupon %s is rejected with %s', async (couponCode, error) => {
     const member = await registerMember('coupon-rejected@example.com');
     await addProductToCart(member.token, primaryProduct.id, 1);
 
-    // subtotal 700 is below the FLOWER100 minimum of 800
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', `Bearer ${member.token}`)
-      .send({ ...ORDER_PAYLOAD, couponCode: 'FLOWER100' });
+      .send({ ...ORDER_PAYLOAD, couponCode });
 
     expectEnvelope(response, 400);
     expect(response.body.data).toBeNull();
-    expect(response.body.error).toBe('COUPON_MIN_SUBTOTAL_NOT_MET');
+    expect(response.body.error).toBe(error);
     expect(db.prepare('SELECT COUNT(*) AS count FROM orders').get().count).toBe(0);
     expect(db.prepare('SELECT COUNT(*) AS count FROM order_items').get().count).toBe(0);
     expect(db.prepare('SELECT stock FROM products WHERE id = ?').get(primaryProduct.id).stock).toBe(10);
