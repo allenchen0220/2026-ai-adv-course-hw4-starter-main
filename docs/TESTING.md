@@ -135,11 +135,12 @@ Integration Test 中有兩層防護：
 
 | 檔案 | 範圍 |
 |------|------|
+| `tests/coupon.test.js` | Coupon 純函式：三組優惠碼、門檻、四捨五入與上限、大小寫、無效輸入 |
 | `tests/shipping.test.js` | Shipping 純函式、門檻與附加費 |
 | `tests/auth.test.js` | 註冊、登入、重複 Email、個人資料、非字串欄位、JSON 格式錯誤 |
 | `tests/products.test.js` | 商品列表、分頁、詳情與 404 |
 | `tests/cart.test.js` | 訪客/會員購物車 CRUD、數量驗證、登入/註冊時合併訪客購物車（含庫存上限） |
-| `tests/orders.test.js` | 建單、配送費、查詢與認證、模擬付款僅限測試環境 |
+| `tests/orders.test.js` | 建單、配送費、查詢與認證（含他人訂單 404）、模擬付款僅限測試環境 |
 | `tests/adminProducts.test.js` | 後台商品 CRUD 與權限、刪除仍在購物車中的商品、名稱驗證 |
 | `tests/adminOrders.test.js` | 後台訂單列表、詳情與篩選 |
 

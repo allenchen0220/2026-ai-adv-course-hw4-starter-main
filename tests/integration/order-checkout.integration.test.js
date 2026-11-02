@@ -273,6 +273,60 @@ describe('Order checkout integration flow', () => {
     expect(cartItem.quantity).toBe(3);
   });
 
+  it('persists the coupon snapshot and charges ECPay the discounted total', async () => {
+    const member = await registerMember('coupon-flow@example.com');
+    await addProductToCart(member.token, primaryProduct.id, 2);
+
+    const orderResponse = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`)
+      .send({ ...ORDER_PAYLOAD, couponCode: 'spring10' });
+
+    // subtotal 1400, SPRING10 discount 140, shipping 60 + 200 + 250 = 510
+    expectEnvelope(orderResponse, 201);
+    expect(orderResponse.body.data).toMatchObject({
+      subtotal: 1400,
+      discount: 140,
+      coupon_code: 'SPRING10',
+      shipping_fee: 510,
+      total_amount: 1770
+    });
+
+    const orderId = orderResponse.body.data.id;
+    expect(db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId)).toMatchObject({
+      subtotal: 1400,
+      coupon_code: 'SPRING10',
+      discount: 140,
+      shipping_fee: 510,
+      total_amount: 1770
+    });
+
+    const formResponse = await request(app).get(`/ecpay/payment/${orderId}`);
+    expect(formResponse.status).toBe(200);
+    expect(parseHiddenInputs(formResponse.text).TotalAmount).toBe('1770');
+  });
+
+  it('leaves orders, stock and cart untouched when the coupon is rejected', async () => {
+    const member = await registerMember('coupon-rejected@example.com');
+    await addProductToCart(member.token, primaryProduct.id, 1);
+
+    // subtotal 700 is below the FLOWER100 minimum of 800
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`)
+      .send({ ...ORDER_PAYLOAD, couponCode: 'FLOWER100' });
+
+    expectEnvelope(response, 400);
+    expect(response.body.data).toBeNull();
+    expect(response.body.error).toBe('COUPON_MIN_SUBTOTAL_NOT_MET');
+    expect(db.prepare('SELECT COUNT(*) AS count FROM orders').get().count).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS count FROM order_items').get().count).toBe(0);
+    expect(db.prepare('SELECT stock FROM products WHERE id = ?').get(primaryProduct.id).stock).toBe(10);
+    expect(db.prepare(
+      'SELECT quantity FROM cart_items WHERE user_id = ? AND product_id = ?'
+    ).get(member.user.id, primaryProduct.id).quantity).toBe(1);
+  });
+
   it('rolls back the entire transaction when an order item insert fails midway', async () => {
     const secondProduct = createProduct({
       name: '回滾測試花束',
