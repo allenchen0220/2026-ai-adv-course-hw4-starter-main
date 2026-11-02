@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Added
+- 結帳優惠碼（Issue #1）：新增 `src/utils/coupon.js`，支援 `FLOWER100`（滿 800 折 100）與 `SPRING10`（9 折、最多折 300），`SUMMER50` 已失效
+- `POST /api/orders` 新增選填 `couponCode`；訂單新增 `coupon_code`、`discount` 快照欄位，建單、列表與詳情回應皆包含這兩個欄位
+- 免運門檻改以折扣後的商品小計判斷，訂單總額為 `subtotal - discount + shipping_fee`
+- 訂單詳情與後台訂單詳情顯示優惠折抵
+- 新增 `tests/coupon.test.js` 單元測試與 2 項優惠碼 Integration Test
+
 ### Changed
 - 抽出 `src/services/orderService.js`（訂單查詢、序列化與建單 transaction）與 `src/services/paymentService.js`（QueryTradeInfo 結果判斷與付款狀態更新）
 - 新增 `src/utils/validators.js` 統一路由輸入驗證；Shipping 模組改以規則表描述，單元測試改為 table-driven

@@ -3,6 +3,7 @@ const db = require('../database');
 const authMiddleware = require('../middleware/authMiddleware');
 const { queryTradeInfo } = require('../utils/ecpay');
 const { SHIPPING_METHODS, calculateShipping } = require('../utils/shipping');
+const { applyCoupon } = require('../utils/coupon');
 const {
   serializeOrder,
   findOrderById,
@@ -15,7 +16,7 @@ const {
   createOrderFromCart
 } = require('../services/orderService');
 const { isTradePaid, markOrderPaid } = require('../services/paymentService');
-const { isNonEmptyString } = require('../utils/validators');
+const { isNonEmptyString, isOptionalString } = require('../utils/validators');
 
 const router = express.Router();
 
@@ -59,6 +60,9 @@ function testEnvOnly(req, res, next) {
  *                 type: boolean
  *               isExpress:
  *                 type: boolean
+ *               couponCode:
+ *                 type: string
+ *                 description: 選填，不分大小寫（FLOWER100、SPRING10）
  *     responses:
  *       201:
  *         description: 訂單建立成功
@@ -76,6 +80,11 @@ function testEnvOnly(req, res, next) {
  *                       type: string
  *                     subtotal:
  *                       type: integer
+ *                     discount:
+ *                       type: integer
+ *                     coupon_code:
+ *                       type: string
+ *                       nullable: true
  *                     shipping_fee:
  *                       type: integer
  *                     shipping_method:
@@ -108,7 +117,7 @@ function testEnvOnly(req, res, next) {
  *                 message:
  *                   type: string
  *       400:
- *         description: 購物車為空或庫存不足或收件資訊缺失
+ *         description: 購物車為空、庫存不足、收件資訊缺失，或優惠碼無效、已失效、未達門檻（COUPON_NOT_FOUND、COUPON_EXPIRED、COUPON_MIN_SUBTOTAL_NOT_MET）
  */
 router.post('/', (req, res) => {
   const {
@@ -117,7 +126,8 @@ router.post('/', (req, res) => {
     recipientAddress,
     shippingMethod,
     isRemoteArea,
-    isExpress
+    isExpress,
+    couponCode
   } = req.body;
   const userId = req.user.userId;
 
@@ -154,6 +164,14 @@ router.post('/', (req, res) => {
     });
   }
 
+  if (!isOptionalString(couponCode)) {
+    return res.status(400).json({
+      data: null,
+      error: 'VALIDATION_ERROR',
+      message: 'couponCode 必須為字串'
+    });
+  }
+
   const cartItems = getCheckoutItems(userId);
 
   if (cartItems.length === 0) {
@@ -174,12 +192,24 @@ router.post('/', (req, res) => {
     });
   }
 
-  // Calculate the subtotal and server-authoritative shipping fee.
+  // Calculate the subtotal, coupon discount and server-authoritative shipping fee.
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.product_price * item.quantity, 0
   );
+
+  // Reject the coupon before anything is written, so the cart and stock stay untouched
+  const coupon = applyCoupon({ subtotal, couponCode });
+  if (!coupon.ok) {
+    return res.status(400).json({
+      data: null,
+      error: coupon.error,
+      message: coupon.message
+    });
+  }
+
+  // Free shipping is judged on the discounted subtotal, so totalAmount = subtotal - discount + shippingFee
   const shipping = calculateShipping({
-    subtotal,
+    subtotal: subtotal - coupon.discount,
     method: shippingMethod,
     isRemoteArea,
     isExpress
@@ -191,6 +221,7 @@ router.post('/', (req, res) => {
     delivery: { method: shippingMethod, isRemoteArea, isExpress },
     cartItems,
     subtotal,
+    coupon,
     shipping
   });
 
@@ -202,6 +233,8 @@ router.post('/', (req, res) => {
       id: order.id,
       order_no: order.order_no,
       subtotal: order.subtotal,
+      discount: order.discount,
+      coupon_code: order.coupon_code,
       shipping_fee: order.shipping_fee,
       shipping_method: order.shipping_method,
       is_remote_area: Boolean(order.is_remote_area),
@@ -246,6 +279,11 @@ router.post('/', (req, res) => {
  *                             type: string
  *                           subtotal:
  *                             type: integer
+ *                           discount:
+ *                             type: integer
+ *                           coupon_code:
+ *                             type: string
+ *                             nullable: true
  *                           shipping_fee:
  *                             type: integer
  *                           shipping_method:
@@ -309,6 +347,11 @@ router.get('/', (req, res) => {
  *                       type: string
  *                     subtotal:
  *                       type: integer
+ *                     discount:
+ *                       type: integer
+ *                     coupon_code:
+ *                       type: string
+ *                       nullable: true
  *                     shipping_fee:
  *                       type: integer
  *                     shipping_method:
