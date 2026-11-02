@@ -136,6 +136,7 @@ Integration Test 中有兩層防護：
 | 檔案 | 範圍 |
 |------|------|
 | `tests/coupon.test.js` | Coupon 純函式：三組優惠碼、門檻、四捨五入與上限、大小寫、無效輸入 |
+| `tests/orderListQuery.test.js` | 訂單列表參數：預設值、狀態白名單、limit 上限 50、非正整數與重複參數；`tests/orders.test.js` 另測列表 API 的分頁、篩選與 400 |
 | `tests/shipping.test.js` | Shipping 純函式、門檻與附加費 |
 | `tests/auth.test.js` | 註冊、登入、重複 Email、個人資料、非字串欄位、JSON 格式錯誤 |
 | `tests/products.test.js` | 商品列表、分頁、詳情與 404 |

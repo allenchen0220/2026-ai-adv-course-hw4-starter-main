@@ -105,6 +105,47 @@ describe('Orders API', () => {
     expect(res.body.data).toHaveProperty('orders');
     expect(Array.isArray(res.body.data.orders)).toBe(true);
     expect(res.body.data.orders.length).toBeGreaterThan(0);
+    expect(res.body.data.pagination).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
+  });
+
+  it('should filter the order list by status and cap limit at 50', async () => {
+    const pending = await request(app)
+      .get('/api/orders?status=pending&limit=100')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(pending.status).toBe(200);
+    expect(pending.body.data.orders.map(order => order.id)).toEqual([orderId]);
+    expect(pending.body.data.pagination).toEqual({ page: 1, limit: 50, total: 1, totalPages: 1 });
+
+    const paid = await request(app)
+      .get('/api/orders?status=paid')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(paid.status).toBe(200);
+    expect(paid.body.data.orders).toEqual([]);
+    expect(paid.body.data.pagination).toEqual({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  });
+
+  it('should return an empty page past the last page', async () => {
+    const res = await request(app)
+      .get('/api/orders?page=2')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.orders).toEqual([]);
+    expect(res.body.data.pagination).toEqual({ page: 2, limit: 10, total: 1, totalPages: 1 });
+  });
+
+  it('should reject invalid order list query parameters', async () => {
+    for (const query of ['?status=unknown', '?page=0', '?page=abc', '?limit=-1', '?limit=1.5']) {
+      const res = await request(app)
+        .get(`/api/orders${query}`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('data', null);
+      expect(res.body).toHaveProperty('error', 'VALIDATION_ERROR');
+    }
   });
 
   it('should get order detail', async () => {

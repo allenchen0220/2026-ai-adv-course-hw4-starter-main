@@ -36,5 +36,21 @@
         </div>
       </div>
     </a>
+
+    <div v-if="pagination.totalPages > 1" class="flex items-center justify-center gap-4 pt-2 text-sm">
+      <button
+        type="button"
+        class="px-4 py-1.5 rounded-full border border-gray-200 text-text-secondary disabled:opacity-40"
+        :disabled="pagination.page <= 1"
+        @click="loadOrders(pagination.page - 1)"
+      >上一頁</button>
+      <span class="text-text-muted">第 {{ pagination.page }} / {{ pagination.totalPages }} 頁</span>
+      <button
+        type="button"
+        class="px-4 py-1.5 rounded-full border border-gray-200 text-text-secondary disabled:opacity-40"
+        :disabled="pagination.page >= pagination.totalPages"
+        @click="loadOrders(pagination.page + 1)"
+      >下一頁</button>
+    </div>
   </div>
 </div>
