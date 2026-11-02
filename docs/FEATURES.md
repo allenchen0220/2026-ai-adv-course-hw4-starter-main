@@ -316,7 +316,7 @@
 | 參數 | 型別 | 預設 | 驗證規則 |
 |------|------|------|----------|
 | status | string | 不篩選 | `pending`、`paid` 或 `failed` |
-| page | integer | 1 | 正整數 |
+| page | integer | 1 | 正整數（不超過 `Number.MAX_SAFE_INTEGER`） |
 | limit | integer | 10 | 正整數，超過 50 以 50 計 |
 
 **回應格式**（與 `GET /api/admin/orders` 相同）：

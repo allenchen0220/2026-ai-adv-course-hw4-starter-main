@@ -32,9 +32,12 @@ describe('Order list query', () => {
     ['page 為小數', { page: '1.5' }],
     ['page 不是數字', { page: 'abc' }],
     ['page 為空字串', { page: '' }],
+    ['page 超過安全整數範圍', { page: '9007199254740993' }],
+    ['page 遠超過資料庫整數範圍', { page: '99999999999999999999999' }],
     ['limit 為 0', { limit: '0' }],
     ['limit 為負數', { limit: '-1' }],
-    ['limit 重複帶入', { limit: ['5', '10'] }]
+    ['limit 重複帶入', { limit: ['5', '10'] }],
+    ['limit 超過安全整數範圍', { limit: '99999999999999999999999' }]
   ])('%s時回傳錯誤', (_label, query) => {
     const result = parseOrderListQuery(query);
 

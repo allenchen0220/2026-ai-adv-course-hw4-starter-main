@@ -12,6 +12,12 @@ function invalidQuery(message) {
   return Object.freeze({ ok: false, message });
 }
 
+// Digit strings beyond Number.MAX_SAFE_INTEGER lose precision and overflow SQLite's OFFSET
+function parseSafePositiveInteger(value) {
+  const parsed = parsePositiveInteger(value);
+  return parsed !== null && Number.isSafeInteger(parsed) ? parsed : null;
+}
+
 /**
  * Parse the member order list query (status, page, limit).
  * Returns { ok: true, status, page, limit } or { ok: false, message }.
@@ -22,12 +28,12 @@ function parseOrderListQuery({ status, page, limit } = {}) {
     return invalidQuery(`status 必須為 ${ORDER_STATUSES.join('、')}`);
   }
 
-  const parsedPage = page === undefined ? ORDER_LIST_PAGINATION.DEFAULT_PAGE : parsePositiveInteger(page);
+  const parsedPage = page === undefined ? ORDER_LIST_PAGINATION.DEFAULT_PAGE : parseSafePositiveInteger(page);
   if (parsedPage === null) {
     return invalidQuery('page 必須為正整數');
   }
 
-  const parsedLimit = limit === undefined ? ORDER_LIST_PAGINATION.DEFAULT_LIMIT : parsePositiveInteger(limit);
+  const parsedLimit = limit === undefined ? ORDER_LIST_PAGINATION.DEFAULT_LIMIT : parseSafePositiveInteger(limit);
   if (parsedLimit === null) {
     return invalidQuery('limit 必須為正整數');
   }
