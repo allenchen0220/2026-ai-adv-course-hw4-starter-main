@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const { app, request, getAdminToken, registerUser } = require('./setup');
 
 describe('Admin Orders API', () => {
@@ -54,6 +55,7 @@ describe('Admin Orders API', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveProperty('orders');
+    expect(res.body.data.orders.length).toBeGreaterThan(0);
     for (const order of res.body.data.orders) {
       expect(order.status).toBe('pending');
     }
@@ -89,5 +91,21 @@ describe('Admin Orders API', () => {
     expect(res.status).toBe(403);
     expect(res.body).toHaveProperty('error');
     expect(res.body.error).not.toBeNull();
+  });
+
+  it('should use the role stored in the DB, not the one in the token', async () => {
+    const { user } = await registerUser();
+    const forgedToken = jwt.sign(
+      { userId: user.id, email: user.email, role: 'admin' },
+      process.env.JWT_SECRET,
+      { algorithm: 'HS256', expiresIn: '1h' }
+    );
+
+    const res = await request(app)
+      .get('/api/admin/orders')
+      .set('Authorization', `Bearer ${forgedToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toHaveProperty('data', null);
   });
 });

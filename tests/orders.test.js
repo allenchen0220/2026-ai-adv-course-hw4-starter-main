@@ -77,7 +77,7 @@ describe('Orders API', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('data', null);
-    expect(res.body).toHaveProperty('error');
+    expect(res.body).toHaveProperty('error', 'CART_EMPTY');
   });
 
   it('should fail to create order without auth', async () => {
@@ -127,6 +127,18 @@ describe('Orders API', () => {
     );
     expect(res.body.data).toHaveProperty('items');
     expect(Array.isArray(res.body.data.items)).toBe(true);
+  });
+
+  it('should return 404 for another member\'s order', async () => {
+    const { token: otherToken } = await registerUser();
+
+    const res = await request(app)
+      .get(`/api/orders/${orderId}`)
+      .set('Authorization', `Bearer ${otherToken}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty('data', null);
+    expect(res.body).toHaveProperty('error', 'NOT_FOUND');
   });
 
   it('should return 404 for non-existent order', async () => {

@@ -43,6 +43,19 @@ describe('Cart API', () => {
     expect(res.body.data.items.length).toBeGreaterThan(0);
   });
 
+  it('should reject non-positive-integer quantity on update', async () => {
+    for (const quantity of [0, -1, 0.5, '1e1', true, null, '']) {
+      const res = await request(app)
+        .patch(`/api/cart/${cartItemId}`)
+        .set('X-Session-Id', sessionId)
+        .send({ quantity });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('data', null);
+      expect(res.body).toHaveProperty('error', 'VALIDATION_ERROR');
+    }
+  });
+
   it('should update cart item quantity (guest mode)', async () => {
     const res = await request(app)
       .patch(`/api/cart/${cartItemId}`)

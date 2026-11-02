@@ -3,10 +3,16 @@ const { buildAioFormHtml } = require('../utils/ecpay');
 const { findOrderById, getOrderItemSummaries } = require('../services/orderService');
 const router = express.Router();
 
+// Log render failures server-side; never send template internals to the client
+function renderError(res, err) {
+  console.error('Render error:', err.message);
+  return res.status(500).send('伺服器錯誤');
+}
+
 // Helper to render with front layout
 function renderFront(res, page, locals = {}) {
   res.render('pages/' + page, { layout: 'front', ...locals }, function (err, body) {
-    if (err) return res.status(500).send(err.message);
+    if (err) return renderError(res, err);
     res.render('layouts/front', { body, ...locals });
   });
 }
@@ -14,7 +20,7 @@ function renderFront(res, page, locals = {}) {
 // Helper to render with admin layout
 function renderAdmin(res, page, locals = {}) {
   res.render('pages/admin/' + page, locals, function (err, body) {
-    if (err) return res.status(500).send(err.message);
+    if (err) return renderError(res, err);
     res.render('layouts/admin', { body, ...locals });
   });
 }
